@@ -1,3 +1,6 @@
+# N-period solver for U(x) = ln(x). Works until N=100ish
+
+
 import numpy
 import matplotlib.pyplot as plt
 import math
