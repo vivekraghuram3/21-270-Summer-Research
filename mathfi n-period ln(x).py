@@ -7,24 +7,22 @@ from sympy import S
 import copy
 import scipy.optimize
 import scipy.special
-import scipy.misc
 
 #p = 0.02 # actual probability Heads
 
 def nCr(n, r):
-	#return math.factorial(n)/(math.factorial(n-r)*math.factorial(r))
-	return scipy.misc.comb(n,r)
+	return math.factorial(n)/(math.factorial(n-r)*math.factorial(r))
 S = 1  # Initial cost of Stock
-u = 1.3 # Up Factor
-d = 0.94 
+u = 1000 # Up Factor
+d = .01
 X = 100  # initial capital
-r = 0.06
+r = 1/4
 
 
-def findPoly(y,N,p):  # Assuming U(x) = ln(x), return a polynomial function for E(U(x))
+def findPoly(N,p):  # Assuming U(x) = ln(x), return a polynomial function for E(U(x))
 	q = 1-p # actual probability Tails
 
-	#y = sympy.symbols("y", real=True)  # Number of shares of each stock
+	y = sympy.symbols("y", real=True)  # Number of shares of each stock
 
 	poly = 0
 
@@ -40,33 +38,31 @@ def findPoly(y,N,p):  # Assuming U(x) = ln(x), return a polynomial function for 
 
 
 #return all y roots
-# def getRoots(N,p): 
-# 	q = 1-p # actual probability Tails
+def getRoots(N,p): 
+	q = 1-p # actual probability Tails
 
-# 	util = 0
-# 	#yValues = testSymPy(N)
-# 	y = sympy.symbols("y", real = True)
-# 	expValPoly = findPoly(N,p)
-# 	roots = (sympy.solveset(sympy.Eq(expValPoly, 0), y))
-# 	roots = list(roots)
-# 	boots = []
-# 	print("before real filter", roots)
-# 	for root in roots:
-# 		if (sympy.re(root) == root):
-# 			boots.append(sympy.re(root))
+	util = 0
+	#yValues = testSymPy(N)
+	y = sympy.symbols("y", real = True)
+	expValPoly = findPoly(N,p)
+	roots = (sympy.solveset(sympy.Eq(expValPoly, 0), y))
+	roots = list(roots)
+	boots = []
+	#print("before real filter", roots)
+	for root in roots:
+		if (sympy.re(root) == root):
+			boots.append(sympy.re(root))
 
-# 	return boots
-def getRoots(N,p):
-    q = 1-p
-    a = 0
-    b = 228
-    max_y = scipy.optimize.root_scalar(findPoly, args = (N,p), bracket=[a,b], method="bisect")
+	return boots
+# def getRoots(N,p):
+#     q = 1-p
+#     max_y = scipy.optimize.root_scalar(findPoly, args = (N,p), bracket=[-1000,1000], method="bisect")
     
-    #print(-1*max_y.fun)
-    print(max_y.root)
-    return max_y.root
+#     #print(-1*max_y.fun)
+#     print(max_y.root)
+#     return max_y.root
 
-    
+
 def getValidRoots(N,p): # return all valid roots
 	q = 1-p # actual probability Tails
 
@@ -85,12 +81,12 @@ def getValidRoots(N,p): # return all valid roots
 			elif (((X-S*root)*((1+r)**N)+((u**i)*(d**(N-i))*S*root))) <= 0:
 				badRoots.add(root)
 
-	print("bad",badRoots)
+	#print("bad",badRoots)
 	allRoots = set(allRoots)
 
 	goodRoots = allRoots.difference(badRoots)
 
-	print("goodRoots",sorted(list(goodRoots)))
+	#print("goodRoots",sorted(list(goodRoots)))
 	posRoots = []
 	if list(goodRoots) == []:
 		for root in rootsCopy:
@@ -130,26 +126,30 @@ def getValidUtilNY(N,p): # get Ny yValues
 		validRoots[i] *= N
 	return validRoots
 yCoord = []
-#print("here",getRoots(11,0.51))
+#print("here",getRoots(1,0.26666667))
 # print("here",getValidRoots(1,0.52)[0])
 # print("test", getValidRoots(15))
 # print("exp",getExpectedUtil(11))
 #print(getValidUtilNY(15))
-def graph(m1, m2):
+def graph(m1, m2): 
 	div = 10**max((len(str(m1)), len(str(m2))))
 	#print(div)
 
-	for j in range(50,51):
+	for j in range(1, 10):
 		print("p=",j/10)
-		for i in range(1,20):
+		for i in range(1,6):
 			print("N="+str(i))
 			global yCoord
 
-			yCoord.append(getRoots(i, j/100))
-			#yCoord.append(getExpectedUtil(i, j/10)[0])
+			yCoord.append(getValidRoots(i, j/10))
+			#yCoord.append(getExpectedUtil(i,   j/8000)[0])
 
 		print("ycoord", yCoord)
-		plt.plot([i for i in range(1,len(yCoord)+1)], yCoord, label = str(j/100))
+		diffSet = []
+		for idx in range(len(yCoord)-1):
+			diffSet.append(yCoord[idx+1][0]-yCoord[idx][0])
+		print("diffSet", diffSet)
+		plt.plot([i for i in range(1,len(yCoord)+1)], yCoord, label = str(j/10))
 		yCoord = []
 
 		#plt.plot(i, getExpectedUtil(i), "o" , label = str(i))

@@ -9,17 +9,16 @@ import scipy.optimize
 import scipy.special
 import scipy.misc
 
-#p = 0.02 # actual probability Heads
+S = 1  # Initial cost of Stock
+u = 2  # Up Factor
+d = 1/2
+X = 100  # initial capital
+r = 0.25
+mu = 2.5
 
 def nCr(n, r):
 	#return math.factorial(n)/(math.factorial(n-r)*math.factorial(r))
 	return scipy.misc.comb(n,r)
-S = 1  # Initial cost of Stock
-u = 1.3 # Up Factor
-d = 0.94 
-X = 100  # initial capital
-r = 0.06
-
 
 def findPoly(y,N,p):  # Assuming U(x) = ln(x), return a polynomial function for E(U(x))
 	q = 1-p # actual probability Tails
@@ -33,7 +32,7 @@ def findPoly(y,N,p):  # Assuming U(x) = ln(x), return a polynomial function for 
 		binom = nCr(N, i)
 		numerator = (-1*S*((1+r)**N)) + (u**i)*(d**(N-i))*S
 		denominator = ((X-S*y)*((1+r)**N) + ((u**i)*(d**(N-i))*S*y) )
-		poly += prob * binom * (numerator/denominator)
+		poly += prob * binom *numerator* ((math.e)**(-1*mu*denominator))
 		#poly += -1* prob * binom * math.log(denominator)
 	#print("poly", poly)
 	return poly
@@ -58,9 +57,9 @@ def findPoly(y,N,p):  # Assuming U(x) = ln(x), return a polynomial function for 
 # 	return boots
 def getRoots(N,p):
     q = 1-p
-    a = 0
-    b = 228
-    max_y = scipy.optimize.root_scalar(findPoly, args = (N,p), bracket=[a,b], method="bisect")
+    a1 = 0.0001
+    b1 = 100
+    max_y = scipy.optimize.root_scalar(findPoly, args = (N,p), bracket=[a1,b1], method="bisect")
     
     #print(-1*max_y.fun)
     print(max_y.root)
@@ -130,7 +129,7 @@ def getValidUtilNY(N,p): # get Ny yValues
 		validRoots[i] *= N
 	return validRoots
 yCoord = []
-#print("here",getRoots(11,0.51))
+print("here",getRoots(9,0.6))
 # print("here",getValidRoots(1,0.52)[0])
 # print("test", getValidRoots(15))
 # print("exp",getExpectedUtil(11))
@@ -139,24 +138,24 @@ def graph(m1, m2):
 	div = 10**max((len(str(m1)), len(str(m2))))
 	#print(div)
 
-	for j in range(50,51):
+	for j in range(6,8):
 		print("p=",j/10)
-		for i in range(1,20):
+		for i in range(1,18):
 			print("N="+str(i))
 			global yCoord
 
-			yCoord.append(getRoots(i, j/100))
+			yCoord.append(getRoots(i, j/10))
 			#yCoord.append(getExpectedUtil(i, j/10)[0])
 
 		print("ycoord", yCoord)
-		plt.plot([i for i in range(1,len(yCoord)+1)], yCoord, label = str(j/100))
+		plt.plot([i for i in range(1,len(yCoord)+1)], yCoord,label = str(j/10))
 		yCoord = []
 
 		#plt.plot(i, getExpectedUtil(i), "o" , label = str(i))
 	plt.xlabel('N (period-number)')
 	plt.ylabel('Optimal y-value')
 	plt.grid(True)
-	plt.title("u="+str(u)+" "+"d="+str(d)+" "+"r="+str(r)+" "+"X="+str(X)+" "+"S="+str(S))
+	plt.title("u="+str(u)+" "+"d="+str(d)+" "+"r="+str(r)+" "+"X="+str(X)+" "+"S="+str(S)+" "+"mu="+str(mu)+" ")
 	plt.legend(bbox_to_anchor = (1.0, 1.15), loc='upper left', borderaxespad=0.)
 	plt.show()
 graph(1,9)
