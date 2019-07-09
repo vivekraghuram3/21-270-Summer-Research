@@ -7,13 +7,14 @@ using Polynomials
 #using MultivariatePolynomials
 using DynamicPolynomials
 using PolynomialRoots
+using Plots
 
 
-x0 = 100#initial capital
+x0 = 1#initial capital
 s0 = 1 #initial price
-global u = 3.7 #up factor
-global d = 3.66 #down factor
-r = 2.699#interest rate
+global u = 2 #up factor
+global d = 0.5 #down factor
+r = 0.25#interest rate
 @polyvar y p#number of shares
 
 μ = Sym("μ")
@@ -49,23 +50,50 @@ function pOptimalY(n, prob)
     for i in 0:n
         tcap = (x0 - y)*(1+r)^n + u^i * d^(n-i)*y
         deriv = DynamicPolynomials.differentiate(tcap, y)
-        eval += (prob)^i * (1-prob)^(n - i) * binomial(BigInt(n), BigInt(i)) * (3 * deriv /(tcap*tcap*tcap*tcap))
+        eval += (prob)^i * (1-prob)^(n - i) * binomial(BigInt(n), BigInt(i)) * ( deriv /(tcap*tcap*tcap*tcap))
     end
-
     numer = numerator(eval)
     coeffs = [coefficient(numer, y^i) for i = 0 : maxdegree(numer)]
-    roo = real(PolynomialRoots.roots(coeffs))
-    filter!(x->x>0, roo)
-    if isempty(roo)
-        return 0
+    roo = PolynomialRoots.roots(coeffs)
+
+    badRoots = Set()
+
+    for root in roo
+        if imag(root) != 0
+            push!(badRoots, root)
+        else
+            root = real(root)
+            for i in 0:n
+                if (((x0 - s0 * root) * ( (1+r)^n) + ( (u^i) * (d^(n-i)) * s0 *root))) <= 0
+                    push!(badRoots, root)
+                end
+                break
+            end
+        end
     end
-    #println(roo)
-    return findmin(roo)[1]
+    roo = Set(real.(roo))
+    goodRoots = setdiff(roo, badRoots)
+    goodRoots = collect(goodRoots)
+    goodRoots = sort!(goodRoots)
+
+    tpls = zeros(BigFloat, 0, 2)
+    for root in goodRoots
+        tcap = 0
+        for i in 0:n
+            tcap +=  (prob)^i * (1-prob)^(n - i) * binomial(BigInt(n), BigInt(i)) * -1/3 *((x0 - s0 * root)*((1+r)^n) +((u^i) * (d^(n-i)) * s0 *root))^(-3)
+        end
+        v = [root tcap]
+        tpls = vcat(v, tpls)
+    end
+    a = findmax(tpls)
+    opy = tpls[(a[2])[1]]
+    return opy
 end
 
 
 function getSwitch(n, min, max, steps)
     arr = zeros(steps + 1, 4)
+    sw = zeros(0, 2)
     for i in 1:(steps + 1)
         println(i)
         arr[i, 1] = min + (i-1) * (max - min)/steps
@@ -75,8 +103,6 @@ function getSwitch(n, min, max, steps)
         arr[i, 3] = b
         arr[i, 4] = b - a
     end
-    println(arr)
-    println(size(arr, 1) + 1)
     for i in 1:(size(arr, 1))
         row = arr[i, :]
         println(row)
@@ -84,17 +110,56 @@ function getSwitch(n, min, max, steps)
             continue
         elseif i == steps
             break
-        elseif arr[i-1, 4] < 0 && arr[i, 4] > 0 && arr[i+1, 4] >= 0
-            println(arr[i, 1])
-        #elseif arr[i-1, 4] > 0 && arr[i, 4] < 0 && arr[i+1, 4] <=0
-            #println(arr[i, 1])
+        elseif arr[i-1, 4] < 0 && arr[i, 4] > 0
+            println("decreasing to increasing: ", arr[i, 1])
+        elseif arr[i-1, 4] > 0 && arr[i, 4] < 0
+            println("increasing to decreasing: ", arr[i, 1])
         end
     end
-    return -1
+    return sw
 end
 
-println(getSwitch(10, p̃, 1, 100))
-println(p̃)
+#println(getSwitch(15, 0.58, 0.6,  100))
+#println(p̃)
+
+#plots optimaly for s curves of constant p ∈ [min, max] for periods [1, n]
+function graph(n, min, max, s)
+    allY = zeros(0)
+    probs = zeros(0)
+    for i in 1:(s) #for a fixed probability
+        println(i)
+        global arr = zeros(s+1)
+        prob = min + (i-1) * (max - min)/s
+        for j in 1:n
+            arr[j] = pOptimalY(j, arr[i, 1])
+        end
+        x = 1:n
+        y = arr
+        #println("arr", arr)
+        allY = vcat([y], allY)
+        prob = string(prob)
+        probs = vcat(prob, probs)
+        println("probs", probs)
+
+    end
+    display(plot(allY, title="optimalY vs n", label = probs, legend=:best))
+    return arr
+end
+
+graph(10, p̃, 1, 10)
+
+function varyingR(n)
+    switch = zeros(0)
+    for i in (d*100 + 1):(u*100 - 1)
+        global r = i/1000 - 1
+        println("r: ", r)
+        z = getSwitch(n, p̃, 1, 100)
+        println("z: ", z)
+        append!(switch, z)
+        println(switch)
+    end
+    return switch
+end
 
 function rnmExpectedVal(n)
     eval = 0
@@ -105,23 +170,6 @@ function rnmExpectedVal(n)
 end
 
 
-#solve for y in terms of p for n, plug into n+1
-#the goal is to solve for y and p in E[n] and E[n+1]
-function getequipoints(n)
-    g = diff(expectedVal(n), y)
-    h = diff(expectedVal(n+1), y)
-    out = solve([g, h], [y, p])
-    return out
-    #optimize(diff(g, x0)) #Sym type
-end
-#finds switch probability given expected value and number of periods
-#=function findswitch(n, exp)
-    g = diff(expectedval(n), y)
-    h = diff(expectedval(n+1), y)
-    out = solve([g - exp, h - exp], [y, p])
-    return out
-end=#
-#println(typeof(expectedval(1)))
 
 function constantRatio(rat)
     for i in 2:10
@@ -132,11 +180,3 @@ function constantRatio(rat)
         println(real.(getequipoints(1)[2]))
     end
 end
-
-#constantRatio(1/4)
-#=println(typeof(lambdify(expectedval(1))))
-g(y, p) = lambdify(expectedval(1))
-vec = [rnmExpectedVal, p̃]
-optimize(g(x), vec)=#
-
-#tcap(n, i) = (x0 - y)*(1+r)^(n) + u^(i) * d^(n-i) * y
